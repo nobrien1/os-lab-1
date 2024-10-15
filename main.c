@@ -38,11 +38,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <wait.h>
 
-#define MAX_ARGS		64
-#define MAX_ARG_LEN		16
-#define MAX_LINE_LEN	80
-#define WHITESPACE		" ,\t\n"
+#define MAX_ARGS 64
+#define MAX_ARG_LEN 16
+#define MAX_LINE_LEN 80
+#define WHITESPACE " ,\t\n"
 
 struct command_t {
    char *name;
@@ -61,7 +62,8 @@ int main(int argc, char *argv[]) {
    char cmdLine[MAX_LINE_LEN];
    struct command_t command;
 
-   while (TRUE) {
+   while (1)
+   {
       printPrompt();
       /* Read the command line and parse it */
       readCommand(cmdLine);
@@ -73,7 +75,15 @@ int main(int argc, char *argv[]) {
 		 either execute it directly or build a new command structure to
 		 execute next
 	  */
-	  
+
+      printf("name: %s\nargc: %i\n", command.name, command.argc);
+      for (int i = 0; i < MAX_ARGS; i++)
+      {
+         if (command.argv[i] == NULL)
+            break;
+         printf("argv[%i]: %s\n", i, command.argv[i]);
+      }
+
       /* Create a child process to execute the command */
       if ((pid = fork()) == 0) {
          /* Child executing command */
@@ -128,7 +138,7 @@ void printPrompt() {
    /* Build the prompt string to have the machine name,
     * current directory, or other desired information
     */
-   promptString = ...;
+   char *promptString = "linux | >";
    printf("%s ", promptString);
 }
 
