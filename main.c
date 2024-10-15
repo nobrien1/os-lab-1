@@ -39,6 +39,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <wait.h>
+#include <stdlib.h>
 
 #define MAX_ARGS 64
 #define MAX_ARG_LEN 16
@@ -55,6 +56,7 @@ struct command_t {
 int parseCommand(char *, struct command_t *);
 void printPrompt();
 void readCommand(char *);
+int interpretCommand(struct command_t *);
 
 int main(int argc, char *argv[]) {
    int pid;
@@ -70,24 +72,28 @@ int main(int argc, char *argv[]) {
       parseCommand(cmdLine, &command);
       command.argv[command.argc] = NULL;
 
-	  /*
-	     TODO: if the command is one of the shortcuts you're testing for
-		 either execute it directly or build a new command structure to
-		 execute next
-	  */
-
-      printf("name: %s\nargc: %i\n", command.name, command.argc);
-      for (int i = 0; i < MAX_ARGS; i++)
+      // If the command is Q, exit the shell
+      if (strcmp(command.name, "Q") == 0)
       {
-         if (command.argv[i] == NULL)
-            break;
-         printf("argv[%i]: %s\n", i, command.argv[i]);
+         break;
       }
 
       /* Create a child process to execute the command */
       if ((pid = fork()) == 0) {
          /* Child executing command */
-         execvp(command.name, command.argv);
+
+         // See if it is a recognized command, if not, just use execvp
+         int err = interpretCommand(&command);
+         if (err)
+         {
+            int e = execvp(command.name, command.argv);
+            if (e != 0)
+            {
+               printf("\033[0;31m"); // Set the text color to red
+               printf("Error running command. Error code %i\n", err);
+               printf("\033[0m"); // Reset the text color to default
+            }
+         }
       }
       /* Wait for the child to terminate */
       wait(&status); /* EDIT THIS LINE */
@@ -138,8 +144,9 @@ void printPrompt() {
    /* Build the prompt string to have the machine name,
     * current directory, or other desired information
     */
-   char *promptString = "linux | >";
-   printf("%s ", promptString);
+
+   char *user = getenv("USER"); // Get uanet ID from env $USER variable
+   printf("linux (%s) | > ", user);
 }
 
 void readCommand(char *buffer) {
@@ -152,3 +159,138 @@ void readCommand(char *buffer) {
 }
 
 /* End printPrompt and readCommand */
+
+int interpretCommand(struct command_t *cmd)
+{
+   int err = 0;
+   if (strcmp(cmd->name, "C") == 0)
+   {
+      // Attempt to run copy command
+      if (cmd->argc == 3)
+      {
+         // Copy file if correct num args
+         char *argv[] = {"cp", cmd->argv[1], cmd->argv[2], NULL};
+         err = execvp("cp", argv);
+      }
+      else
+      {
+         // Show error message if wrong num args
+         printf("\033[0;31m"); // Set the text color to red
+         printf("ERROR:\tIncorrect number of arguments.\nSyntax:\tC file1 file2\n");
+         printf("\033[0m"); // Reset the text color to default
+      }
+   }
+   else if (strcmp(cmd->name, "D") == 0)
+   {
+      // Attempt to run delete command
+      if (cmd->argc == 2)
+      {
+         // Delete file if corrent num args
+         char *argv[] = {"rm", cmd->argv[1], NULL};
+         err = execvp("rm", argv);
+      }
+      else
+      {
+         // Show error message is wrong num args
+         printf("\033[0;31m"); // Set the text color to red
+         printf("ERROR:\tIncorrect number of arguments.\nSyntax:\tD file\n");
+         printf("\033[0m"); // Reset the text color to default
+      }
+   }
+   else if (strcmp(cmd->name, "E") == 0)
+   {
+      // Echo the comment (all other args except 0)
+      for (int i = 1; i < cmd->argc; i++)
+      {
+         printf("%s ", cmd->argv[i]);
+      }
+      printf("\n");
+   }
+   else if (strcmp(cmd->name, "H") == 0)
+   {
+      // Display help
+      printf("Help:\n");
+      printf("C file1 file2 - Copy; create file2, copy all bytes of file1 to file2 without deleting file1 (exactly 2 arguments required).\n");
+      printf("D file - Delete the named file (exactly 1 argument required).\n");
+      printf("E comment - Echo; display comment on screen (any number of arguments).\n");
+      printf("H - Help (no arguments).\n");
+      printf("L - List the contents of the current directory (no arguments).\n");
+      printf("M file - Make; create the named text file and launching a text editor (exactly 1 argument required).\n");
+      printf("P file - Print; display the contents of the named file on screen (exactly 1 argument required).\n");
+      printf("Q - Quit the shell (no arguments).\n");
+      printf("W - Wipe; clear the screen (no arguments).\n");
+      printf("X program arguments - Execute the named program and pass arguments if wanted (any number of arguments).\n");
+   }
+   else if (strcmp(cmd->name, "L") == 0)
+   {
+      // List current directory and subdirectories
+      printf("\n");
+      system("pwd");
+      printf("\n");
+      system("ls -l");
+   }
+   else if (strcmp(cmd->name, "M") == 0)
+   {
+      // Attempt to create file
+      if (cmd->argc == 2)
+      {
+         // Open text editor: nano file if corrent num args
+         char *argv[] = {"nano", cmd->argv[1], NULL};
+         err = execvp("nano", argv);
+      }
+      else
+      {
+         // Show error message is wrong num args
+         printf("\033[0;31m"); // Set the text color to red
+         printf("ERROR:\tIncorrect number of arguments.\nSyntax:\tM file\n");
+         printf("\033[0m"); // Reset the text color to default
+      }
+   }
+   else if (strcmp(cmd->name, "P") == 0)
+   {
+      // Attempt to print file
+      if (cmd->argc == 2)
+      {
+         // Print file: more file if corrent num args
+         char *argv[] = {"more", cmd->argv[1], NULL};
+         err = execvp("more", argv);
+      }
+      else
+      {
+         // Show error message is wrong num args
+         printf("\033[0;31m"); // Set the text color to red
+         printf("ERROR:\tIncorrect number of arguments.\nSyntax:\tP file\n");
+         printf("\033[0m"); // Reset the text color to default
+      }
+   }
+   else if (strcmp(cmd->name, "W") == 0)
+   {
+      // Clear screen
+      char *argv[] = {"clear", NULL};
+      err = execvp("clear", argv);
+   }
+   else if (strcmp(cmd->name, "X") == 0)
+   {
+      // Build argv[] as every arg but X, then execute the named program
+      char argv[cmd->argc];
+      for (int i = 1; i < cmd->argc; i++)
+      {
+         argv[i - 1] = cmd->argv[i];
+      }
+      argv[cmd->argc - 1] = NULL;
+      err = execvp(argv[0], argv);
+   }
+   else
+   {
+      return 1; // Returns 1 error code if no command recognized
+   }
+
+   if (err != 0)
+   {
+      printf("\033[0;31m"); // Set the text color to red
+      printf("Error running command. Error code %i\n", err);
+      printf("\033[0m"); // Reset the text color to default
+   }
+
+   return 0; // Returns 9 if a command was found, even if it wasn't success
+}
