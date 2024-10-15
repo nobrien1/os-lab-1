@@ -3,7 +3,7 @@
 After extracting the zip, run these commands inside of the extracted folder to run the program.
 
 ```
-gcc main.c
+make
 ./a.out
 ```
 
